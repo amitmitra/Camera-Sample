@@ -1,10 +1,10 @@
 package com.exam.camerasample;
 
-import android.graphics.Bitmap;
+import java.io.File;
 
 public class ImageItem {
 	
-	Bitmap imageBitMap;
+	File imageFile;
 	String focus;
 	String wb;
 	String iso;

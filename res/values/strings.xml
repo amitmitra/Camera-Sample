@@ -5,6 +5,6 @@
 <string name="app_name">Android Camera API Tutorial</string>
 <string name="hello_world">Hello world!</string>
 <string name="action_settings">Settings</string>
-<string name="capture_button">Capture Image From Camera</string>
+<string name="capture_button">Capture All</string>
 <string name="desc">capture image place holder</string>
 </resources>

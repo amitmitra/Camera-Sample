@@ -1,18 +1,21 @@
 package com.exam.camerasample;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import android.content.ContentValues;
 import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.RectF;
@@ -38,23 +41,11 @@ import android.util.Log;
 import android.util.Range;
 import android.util.Size;
 import android.util.SparseIntArray;
-import android.view.LayoutInflater;
 import android.view.Surface;
 import android.view.TextureView;
-import android.view.View;
-import android.widget.GridLayout;
-import android.widget.GridView;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ListView;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import com.exam.camerasample.DLSRCamera.CompareSizesByArea;
 
 public class OffScreenCamera implements AppCamera{
-	
-	private static final String TAG = OffScreenCamera.class.getSimpleName();
 
 	private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
 
@@ -80,17 +71,16 @@ public class OffScreenCamera implements AppCamera{
 	private Handler mBackgroundHandler;
 	private String mCameraId;
 	private CameraDevice mCameraDevice;
-	private static File mFile;
-	private static CaptureRequest.Builder mPreviewRequestBuilder;
+	private CaptureRequest.Builder mPreviewRequestBuilder;
 	private CameraCaptureSession mCaptureSession;
 	private CaptureRequest mPreviewRequest;
 	private HandlerThread mBackgroundThread;
-	private ListView mImageList;
+	private ICameraOperation mCameraopenedListener;
 	
-	private CameraCharacteristics mCharacteristics;
-	
-	public OffScreenCamera(Context context) {
+
+	public OffScreenCamera(Context context, ICameraOperation cameraopenedListener) {
 		mContext = context;
+		mCameraopenedListener = cameraopenedListener;
 	}
 
 	public void start(TextureView textureView) {
@@ -99,9 +89,20 @@ public class OffScreenCamera implements AppCamera{
 		}
 		mTextureView = textureView;
 		startBackgroundThread();
+
+		// When the screen is turned off and turned back on, the SurfaceTexture
+		// is already
+		// available, and "onSurfaceTextureAvailable" will not be called. In
+		// that case, we can open
+		// a camera and start preview from here (otherwise, we wait until the
+		// surface is ready in
+		// the SurfaceTextureListener).
 		if (mTextureView.isAvailable()) {
+			// Log.d("KB", "onSurfaceTextureAvailable isAvailable");
 			openCamera(mTextureView.getWidth(), mTextureView.getHeight());
 		} else {
+			// Log.d("KB",
+			// "onSurfaceTextureAvailable setSurfaceTextureListener");
 			mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
 		}
 	}
@@ -114,40 +115,50 @@ public class OffScreenCamera implements AppCamera{
 
 	private final TextureView.SurfaceTextureListener mSurfaceTextureListener = new TextureView.SurfaceTextureListener() {
 		@Override
-		public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
+		public void onSurfaceTextureAvailable(SurfaceTexture texture,
+				int width, int height) {
+			// Log.d("KB", "onSurfaceTextureAvailable");
 			openCamera(width, height);
 		}
 
 		@Override
-		public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
+		public void onSurfaceTextureSizeChanged(SurfaceTexture texture,
+				int width, int height) {
+			// Log.d("KB", "onSurfaceTextureSizeChanged");
 			configureTransform(width, height);
 		}
 
 		@Override
 		public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
+			// Log.d("KB", "onSurfaceTextureDestroyed");
 			return true;
 		}
 
 		@Override
 		public void onSurfaceTextureUpdated(SurfaceTexture texture) {
+			// Log.d("KB", "onSurfaceTextureUpdated");
 		}
 	};
+	private CameraCharacteristics mCharacteristics;
 
 	private void configureTransform(int viewWidth, int viewHeight) {
-		//		Activity activity = getActivity();
 		if (null == mTextureView || null == mPreviewSize || null == mContext) {
 			return;
 		}
-		int rotation = 0; //mContext.getWindowManager().getDefaultDisplay().getRotation();
+		int rotation = 0; // mContext.getWindowManager().getDefaultDisplay().getRotation();
 		Matrix matrix = new Matrix();
 		RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
-		RectF bufferRect = new RectF(0, 0, mPreviewSize.getHeight(), mPreviewSize.getWidth());
+		RectF bufferRect = new RectF(0, 0, mPreviewSize.getHeight(),
+				mPreviewSize.getWidth());
 		float centerX = viewRect.centerX();
 		float centerY = viewRect.centerY();
 		if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
-			bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+			bufferRect.offset(centerX - bufferRect.centerX(), centerY
+					- bufferRect.centerY());
 			matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
-			float scale = Math.max((float) viewHeight / mPreviewSize.getHeight(), (float) viewWidth / mPreviewSize.getWidth());
+			float scale = Math.max(
+					(float) viewHeight / mPreviewSize.getHeight(),
+					(float) viewWidth / mPreviewSize.getWidth());
 			matrix.postScale(scale, scale, centerX, centerY);
 			matrix.postRotate(90 * (rotation - 2), centerX, centerY);
 		}
@@ -155,41 +166,49 @@ public class OffScreenCamera implements AppCamera{
 	}
 
 	private void setUpCameraOutputs(int width, int height) {
-		CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+		CameraManager manager = (CameraManager) mContext
+				.getSystemService(Context.CAMERA_SERVICE);
 		try {
 			for (String cameraId : manager.getCameraIdList()) {
-				CameraCharacteristics characteristics
-				= manager.getCameraCharacteristics(cameraId);
-				mCharacteristics = characteristics;
-				Log.i("CAM SETTINGS", "TRF");
+				mCharacteristics = manager.getCameraCharacteristics(cameraId);
+
 				// We don't use a front facing camera in this sample.
-				if (characteristics.get(CameraCharacteristics.LENS_FACING)
-						== CameraCharacteristics.LENS_FACING_FRONT) {
+				if (mCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT) {
 					continue;
 				}
 
-				StreamConfigurationMap map = characteristics.get(
-						CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+				StreamConfigurationMap map = mCharacteristics
+						.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
 				// For still image captures, we use the largest available size.
-				Size largest = Collections.max(Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),new CompareSizesByArea());
-				mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
-						ImageFormat.JPEG, /*maxImages*/2);
-				mImageReader.setOnImageAvailableListener(mOnImageAvailableListener, mBackgroundHandler);
+				Size largest = Collections.max(
+						Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+						new CompareSizesByArea());
+				mImageReader = ImageReader.newInstance(largest.getWidth(),
+						largest.getHeight(), ImageFormat.JPEG, /* maxImages */
+						2);
+				mImageReader.setOnImageAvailableListener(
+						mOnImageAvailableListener, mBackgroundHandler);
 
-				// Danger, W.R.! Attempting to use too large a preview size could  exceed the camera
-				// bus' bandwidth limitation, resulting in gorgeous previews but the storage of
+				// Danger, W.R.! Attempting to use too large a preview size
+				// could exceed the camera
+				// bus' bandwidth limitation, resulting in gorgeous previews but
+				// the storage of
 				// garbage capture data.
-				mPreviewSize = chooseOptimalSize(map.getOutputSizes(SurfaceTexture.class),
-						width, height, largest);
+				mPreviewSize = chooseOptimalSize(
+						map.getOutputSizes(SurfaceTexture.class), width,
+						height, largest);
 
-				// We fit the aspect ratio of TextureView to the size of preview we picked.
+				// We fit the aspect ratio of TextureView to the size of preview
+				// we picked.
 				int orientation = mContext.getResources().getConfiguration().orientation;
-				/*if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-					mTextureView.setAspectRatio(mPreviewSize.getWidth(), mPreviewSize.getHeight());
-				} else {
-					mTextureView.setAspectRatio(mPreviewSize.getHeight(), mPreviewSize.getWidth());
-				}*/
+				/*
+				 * if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+				 * mTextureView.setAspectRatio(mPreviewSize.getWidth(),
+				 * mPreviewSize.getHeight()); } else {
+				 * mTextureView.setAspectRatio(mPreviewSize.getHeight(),
+				 * mPreviewSize.getWidth()); }
+				 */
 
 				mCameraId = cameraId;
 				return;
@@ -198,104 +217,88 @@ public class OffScreenCamera implements AppCamera{
 			e.printStackTrace();
 		} catch (NullPointerException e) {
 			e.printStackTrace();
-			// Currently an NPE is thrown when the Camera2API is used but not supported on the
+			// Currently an NPE is thrown when the Camera2API is used but not
+			// supported on the
 			// device this code runs.
-			//			new ErrorDialog().show(getFragmentManager(), "dialog");
+			// new ErrorDialog().show(getFragmentManager(), "dialog");
 		}
 	}
 
 	private void openCamera(int width, int height) {
 		setUpCameraOutputs(width, height);
 		configureTransform(width, height);
-		//	        Activity activity = getActivity();
-		CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+		CameraManager manager = (CameraManager) mContext
+				.getSystemService(Context.CAMERA_SERVICE);
 		try {
 			if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-				throw new RuntimeException("Time out waiting to lock camera opening.");
+				throw new RuntimeException(
+						"Time out waiting to lock camera opening.");
 			}
 			manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
 		} catch (CameraAccessException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
-			throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
+			throw new RuntimeException(
+					"Interrupted while trying to lock camera opening.", e);
 		}
 	}
-	
 
-	
-	private void buildPreviewRequest() {
-		mPreviewRequest = mPreviewRequestBuilder.build();
-		try {
-			mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback, mBackgroundHandler);
-		} catch (CameraAccessException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
-	
-	private void removeAutoFocus(CaptureRequest.Builder captureBuilder) {
-		captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
-				CaptureRequest.CONTROL_AF_MODE_OFF);
-		captureBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
-				CaptureRequest.CONTROL_AF_TRIGGER_IDLE);
-		captureBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
-				CaptureRequest.CONTROL_AF_TRIGGER_IDLE);
-		captureBuilder.set(CaptureRequest.CONTROL_CAPTURE_INTENT,
-				CaptureRequest.CONTROL_CAPTURE_INTENT_STILL_CAPTURE);
-		captureBuilder.set(CaptureRequest.CONTROL_AE_MODE , 
-				CaptureRequest.CONTROL_AE_MODE_OFF);
-		captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
-		captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_FULL);
-	}
-	
-	
-	private void createCameraPreviewSession() {
+	public void createCameraPreviewSession() {
 		try {
 			SurfaceTexture texture = mTextureView.getSurfaceTexture();
 			assert texture != null;
 
-			// We configure the size of default buffer to be the size of camera preview we want.
-			texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
+			// We configure the size of default buffer to be the size of camera
+			// preview we want.
+			texture.setDefaultBufferSize(mPreviewSize.getWidth(),
+					mPreviewSize.getHeight());
 
 			// This is the output Surface we need to start preview.
 			Surface surface = new Surface(texture);
 
 			// We set up a CaptureRequest.Builder with the output Surface.
-			mPreviewRequestBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+			mPreviewRequestBuilder = mCameraDevice
+					.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
 			mPreviewRequestBuilder.addTarget(surface);
 
 			// Here, we create a CameraCaptureSession for camera preview.
-			mCameraDevice.createCaptureSession(Arrays.asList(surface, mImageReader.getSurface()),
+			mCameraDevice.createCaptureSession(
+					Arrays.asList(surface, mImageReader.getSurface()),
 					new CameraCaptureSession.StateCallback() {
 
-				@Override
-				public void onConfigured(CameraCaptureSession cameraCaptureSession) {
-					// The camera is already closed
-					if (null == mCameraDevice) {
-						return;
-					}
+						@Override
+						public void onConfigured(
+								CameraCaptureSession cameraCaptureSession) {
+							// The camera is already closed
+							if (null == mCameraDevice) {
+								return;
+							}
 
-					// When the session is ready, we start displaying the preview.
-					mCaptureSession = cameraCaptureSession;
-					try {
-						Log.i("OSC", "trying to remove focus");
-						removeAutoFocus(mPreviewRequestBuilder);
-						
-						// Finally, we start displaying the camera preview.
-						mPreviewRequest = mPreviewRequestBuilder.build();
-						mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback, mBackgroundHandler);
-						
-					} catch (CameraAccessException e) {
-						e.printStackTrace();
-					}
-				}
+							// When the session is ready, we start displaying
+							// the preview.
+							mCaptureSession = cameraCaptureSession;
+							try {
 
-				@Override
-				public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
-										Log.e("Failed" , "Cam Config");
-				}
-			}, null
-					);
+								removeAutoFocus(mPreviewRequestBuilder);
+
+								mPreviewRequest = mPreviewRequestBuilder
+										.build();
+								mCaptureSession.setRepeatingRequest(
+										mPreviewRequest, mCaptureCallback,
+										mBackgroundHandler);
+								if (mCameraopenedListener != null)
+									mCameraopenedListener.onCameraIntialized();
+							} catch (CameraAccessException e) {
+								e.printStackTrace();
+							}
+						}
+
+						@Override
+						public void onConfigureFailed(
+								CameraCaptureSession cameraCaptureSession) {
+							// showToast("Failed");
+						}
+					}, null);
 		} catch (CameraAccessException e) {
 			e.printStackTrace();
 		}
@@ -306,17 +309,21 @@ public class OffScreenCamera implements AppCamera{
 		private void process(CaptureResult result) {
 			switch (mState) {
 			case STATE_PREVIEW: {
-				// We have nothing to do when the camera preview is working normally.
+				// We have nothing to do when the camera preview is working
+				// normally.
 				break;
 			}
 			case STATE_WAITING_LOCK: {
 				int afState = result.get(CaptureResult.CONTROL_AF_STATE);
-				if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState || CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
+				if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState
+						|| CaptureResult.CONTROL_AF_STATE_NOT_FOCUSED_LOCKED == afState) {
 					// CONTROL_AE_STATE can be null on some devices
-					Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
-					if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
+					Integer aeState = result
+							.get(CaptureResult.CONTROL_AE_STATE);
+					if (aeState == null
+							|| aeState == CaptureResult.CONTROL_AE_STATE_CONVERGED) {
 						mState = STATE_WAITING_NON_PRECAPTURE;
-						captureStillPicture(  0 , 9.0 , 8.0 , 100 , 6); // Varun asks::does this part of code execute?
+						captureStillPicture();
 					} else {
 						runPrecaptureSequence();
 					}
@@ -326,7 +333,9 @@ public class OffScreenCamera implements AppCamera{
 			case STATE_WAITING_PRECAPTURE: {
 				// CONTROL_AE_STATE can be null on some devices
 				Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
-				if (aeState == null || aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE || aeState == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED) {
+				if (aeState == null
+						|| aeState == CaptureResult.CONTROL_AE_STATE_PRECAPTURE
+						|| aeState == CaptureRequest.CONTROL_AE_STATE_FLASH_REQUIRED) {
 					mState = STATE_WAITING_NON_PRECAPTURE;
 				}
 				break;
@@ -334,9 +343,10 @@ public class OffScreenCamera implements AppCamera{
 			case STATE_WAITING_NON_PRECAPTURE: {
 				// CONTROL_AE_STATE can be null on some devices
 				Integer aeState = result.get(CaptureResult.CONTROL_AE_STATE);
-				if (aeState == null || aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
+				if (aeState == null
+						|| aeState != CaptureResult.CONTROL_AE_STATE_PRECAPTURE) {
 					mState = STATE_PICTURE_TAKEN;
-					captureStillPicture( 0 , 9.0 , 8.0 , 100 , 6);
+					captureStillPicture();
 				}
 				break;
 			}
@@ -344,13 +354,15 @@ public class OffScreenCamera implements AppCamera{
 		}
 
 		@Override
-		public void onCaptureProgressed(CameraCaptureSession session, CaptureRequest request, CaptureResult partialResult) {
+		public void onCaptureProgressed(CameraCaptureSession session,
+				CaptureRequest request, CaptureResult partialResult) {
 			process(partialResult);
 		}
 
 		@Override
-		public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
-//			Log.e("KB", "onCaptureCompleted");
+		public void onCaptureCompleted(CameraCaptureSession session,
+				CaptureRequest request, TotalCaptureResult result) {
+			// Log.e("KB", "onCaptureCompleted");
 			process(result);
 		}
 	};
@@ -358,80 +370,49 @@ public class OffScreenCamera implements AppCamera{
 	private void runPrecaptureSequence() {
 		try {
 			// This is how to tell the camera to trigger.
-			mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
+			mPreviewRequestBuilder.set(
+					CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
 					CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER_START);
-			// Tell #mCaptureCallback to wait for the precapture sequence to be set.
+			// Tell #mCaptureCallback to wait for the precapture sequence to be
+			// set.
 			mState = STATE_WAITING_PRECAPTURE;
-			mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback,
-					mBackgroundHandler);
+			mCaptureSession.capture(mPreviewRequestBuilder.build(),
+					mCaptureCallback, mBackgroundHandler);
 		} catch (CameraAccessException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private void captureStillPicture(int picnumber , double focallength , double exposure , int iso , int whitebalance) {
+	private void captureStillPicture() {
 		try {
 			if (null == mContext || null == mCameraDevice) {
 				return;
 			}
-			String picname = String.format("pic%d.jpg", picnumber);
-			mFile = new File(mContext.getExternalFilesDir(null), picname);
 			// This is the CaptureRequest.Builder that we use to take a picture.
-			final CaptureRequest.Builder captureBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+			final CaptureRequest.Builder captureBuilder = mCameraDevice
+					.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
 			captureBuilder.addTarget(mImageReader.getSurface());
 			removeAutoFocus(captureBuilder);
-			
 			captureBuilder.set(CaptureRequest.JPEG_QUALITY, Byte.valueOf("100"));
-			try{
-				mPreviewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 0.0f);
-			} catch (RuntimeException e){
-				Log.e(TAG, "Not Able to Set FOCUS : " + e.getMessage());
-				Toast.makeText(mContext, "Camera Not Supported", Toast.LENGTH_SHORT).show();
-			}
-			
-			try{
-				mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT);
-			} catch (RuntimeException e){
-				Log.e(TAG, "Not able to set White Balance : " + e.getMessage());
-				Toast.makeText(mContext, "Camera Not Supported", Toast.LENGTH_SHORT).show();
-			}
-			
-			try{
-				Range<Integer> range = mCharacteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
-				if(range != null){
-					int minValue = range.getLower();
-					mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, minValue);
-				} else {
-					//take n images and run a algorithm
-				}
-			} catch (RuntimeException e){
-				Log.e(TAG, "Not able to set ISO : " + e.getMessage());
-				Toast.makeText(mContext, "Camera Not Supported", Toast.LENGTH_SHORT).show();
-			}
-			
-			try{
-				mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, (long)0.125);
-			} catch (RuntimeException e){
-				Log.e(TAG, "Not able to set Exposure : " + e.getMessage());
-				Toast.makeText(mContext, "Camera Not Supported", Toast.LENGTH_SHORT).show();
-			}
-			
-			Log.i(TAG, "FOCAL_DISTANCE : " + mPreviewRequestBuilder.get(CaptureRequest.LENS_FOCUS_DISTANCE));
-			Log.i(TAG, "WHITE BALANCE : " + mPreviewRequestBuilder.get(CaptureRequest.CONTROL_AWB_MODE));
-			Log.i(TAG, "ISO : " + mPreviewRequestBuilder.get(CaptureRequest.SENSOR_SENSITIVITY));
-			Log.i(TAG, "EXPOSURE : " + mPreviewRequestBuilder.get(CaptureRequest.SENSOR_EXPOSURE_TIME));
+			captureBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, mCurrentAE);
+			captureBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, mCurrentFocal);
+			captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, mCurrentWbMode);
+			captureBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, mCurrentIso);
 
-			// Orientation
-			// int rotation = mContext.getWindowManager().getDefaultDisplay().getRotation();
-			captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, 1/*ORIENTATIONS.get(rotation)*/);
+			captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, 1/*
+			 * ORIENTATIONS.get
+			 * (rotation)
+			 */);
 
 			CameraCaptureSession.CaptureCallback CaptureCallback = new CameraCaptureSession.CaptureCallback() {
 
 				@Override
-				public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
-					Log.e("_OffScreenCamera_", "Saved");
+				public void onCaptureCompleted(CameraCaptureSession session,
+						CaptureRequest request, TotalCaptureResult result) {
+					// showToast("Saved: " + mFile);
+
+					Log.e("KB", "Saved");
 					unlockFocus();
-					
 				}
 			};
 
@@ -442,11 +423,26 @@ public class OffScreenCamera implements AppCamera{
 		}
 	}
 
-	public void takePicture(ListView imageList) {
-		mImageList = imageList;
-		captureStillPicture( 0 , 0 , 0 , 0 , 0);
+	public void takePicture() {
+		// lockFocus();
+		captureStillPicture();
 	}
 
+	private void removeAutoFocus(CaptureRequest.Builder captureBuilder) {
+		captureBuilder.set(CaptureRequest.CONTROL_AF_MODE,
+				CaptureRequest.CONTROL_AF_MODE_OFF);
+		captureBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
+				CaptureRequest.CONTROL_AF_TRIGGER_IDLE);
+		captureBuilder.set(CaptureRequest.CONTROL_AE_PRECAPTURE_TRIGGER,
+				CaptureRequest.CONTROL_AF_TRIGGER_IDLE);
+		captureBuilder.set(CaptureRequest.CONTROL_CAPTURE_INTENT,
+				CaptureRequest.CONTROL_CAPTURE_INTENT_STILL_CAPTURE);
+		captureBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+				CaptureRequest.CONTROL_AE_MODE_OFF);
+		captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
+		captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.INFO_SUPPORTED_HARDWARE_LEVEL_FULL);
+	}
+	
 	private void lockFocus() {
 		try {
 			// This is how to tell the camera to lock focus.
@@ -454,7 +450,8 @@ public class OffScreenCamera implements AppCamera{
 					CameraMetadata.CONTROL_AF_TRIGGER_START);
 			// Tell #mCaptureCallback to wait for the lock.
 			mState = STATE_WAITING_LOCK;
-			mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), mCaptureCallback, mBackgroundHandler);
+			mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(),
+					mCaptureCallback, mBackgroundHandler);
 		} catch (CameraAccessException e) {
 			e.printStackTrace();
 		}
@@ -463,12 +460,17 @@ public class OffScreenCamera implements AppCamera{
 	private void unlockFocus() {
 		try {
 			// Reset the autofucos trigger
-			mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
-			mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-			mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, mBackgroundHandler);
-			// After this, the camera will go back to the normal state of preview.
+			mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER,
+					CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
+			mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE,
+					CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+			mCaptureSession.capture(mPreviewRequestBuilder.build(),
+					mCaptureCallback, mBackgroundHandler);
+			// After this, the camera will go back to the normal state of
+			// preview.
 			mState = STATE_PREVIEW;
-			mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback, mBackgroundHandler);
+			mCaptureSession.setRepeatingRequest(mPreviewRequest,
+					mCaptureCallback, mBackgroundHandler);
 		} catch (CameraAccessException e) {
 			e.printStackTrace();
 		}
@@ -479,18 +481,21 @@ public class OffScreenCamera implements AppCamera{
 		@Override
 		public void onImageAvailable(ImageReader reader) {
 			Log.e("KB", "onImageAvailable");
-			mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage(), mFile, mImageList));
+			mBackgroundHandler.post(new ImageSaver(reader.acquireNextImage()));
 		}
 	};
 
-	private static Size chooseOptimalSize(Size[] choices, int width, int height, Size aspectRatio) {
-		// Collect the supported resolutions that are at least as big as the preview Surface
+	private static Size chooseOptimalSize(Size[] choices, int width,
+			int height, Size aspectRatio) {
+		// Collect the supported resolutions that are at least as big as the
+		// preview Surface
 		List<Size> bigEnough = new ArrayList<Size>();
 		int w = aspectRatio.getWidth();
 		int h = aspectRatio.getHeight();
 		for (Size option : choices) {
-			if (option.getHeight() == option.getWidth() * h / w &&
-					option.getWidth() >= width && option.getHeight() >= height) {
+			if (option.getHeight() == option.getWidth() * h / w
+					&& option.getWidth() >= width
+					&& option.getHeight() >= height) {
 				bigEnough.add(option);
 			}
 		}
@@ -504,16 +509,17 @@ public class OffScreenCamera implements AppCamera{
 		}
 	}
 
-
 	private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
 		@Override
 		public void onOpened(CameraDevice cameraDevice) {
 			Log.e("KB", "onOpened");
-			// This method is called when the camera is opened.  We start camera preview here.
+			// This method is called when the camera is opened. We start camera
+			// preview here.
 			mCameraOpenCloseLock.release();
 			mCameraDevice = cameraDevice;
 			createCameraPreviewSession();
+
 		}
 
 		@Override
@@ -529,13 +535,16 @@ public class OffScreenCamera implements AppCamera{
 			cameraDevice.close();
 			mCameraDevice = null;
 			if (null != mContext) {
-				//				mContext.finish();
+				// mContext.finish();
 			}
 		}
 	};
+	private long mCurrentAE;
+	private int mCurrentIso;
+	private float mCurrentFocal;
+	private int mCurrentWbMode;
 
 	private static class ImageSaver implements Runnable {
-
 		/**
 		 * The JPEG image
 		 */
@@ -544,36 +553,32 @@ public class OffScreenCamera implements AppCamera{
 		 * The file we save the image into.
 		 */
 		private final File mFile;
-		
-		private ListView mImageList;
 
-		public ImageSaver(Image image, File file, ListView imageList) {
+		public ImageSaver(Image image) {
 			mImage = image;
-			mFile = file;
-			mImageList = imageList;
+			mFile = ((MainActivity) mContext).getFileName();
 		}
 
 		@Override
 		public void run() {
 			ByteBuffer buffer = mImage.getPlanes()[0].getBuffer();
 			byte[] bytes = new byte[buffer.remaining()];
-			Bitmap bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-			
-			LayoutInflater inflater = (LayoutInflater)mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-			View imageItem = inflater.inflate(R.layout.image_item, null);
-			((ImageView)imageItem.findViewById(R.id.captured_image)).setImageBitmap(bm);
-			((TextView)imageItem.findViewById(R.id.focus)).setText(mPreviewRequestBuilder.get(CaptureRequest.LENS_FOCUS_DISTANCE) + "");
-			((TextView)imageItem.findViewById(R.id.wb)).setText(mPreviewRequestBuilder.get(CaptureRequest.CONTROL_AWB_MODE));
-			((TextView)imageItem.findViewById(R.id.iso)).setText(mPreviewRequestBuilder.get(CaptureRequest.SENSOR_SENSITIVITY));
-			((TextView)imageItem.findViewById(R.id.ae)).setText(mPreviewRequestBuilder.get(CaptureRequest.SENSOR_EXPOSURE_TIME)+"");
-			
-			mImageList.addView(imageItem);
-			
-			/*buffer.get(bytes);
+			buffer.get(bytes);
 			FileOutputStream output = null;
 			try {
 				output = new FileOutputStream(mFile);
 				output.write(bytes);
+				addImageToGallery(mFile);
+				ImageItem item = new ImageItem();
+				item.imageFile = mFile;
+				MainActivity activity = ((MainActivity) mContext);
+				activity.bitmapList.add(item);
+				if (activity.camera2captureAll){
+					activity.mMinAEValue = activity.mMinAEValue + activity.mAEStep;
+					activity.captureAllMethod();
+				} else {
+					activity.onPictureCaptured();
+				}
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
@@ -587,31 +592,20 @@ public class OffScreenCamera implements AppCamera{
 						e.printStackTrace();
 					}
 				}
-			}*/
+			}
 		}
 	}
-	
-	private static void addImageToGallery() {
+
+	private static void addImageToGallery(File file) {
 		ContentValues values = new ContentValues();
-	    values.put(Media.TITLE, mFile.getName());
-	    values.put(Media.DESCRIPTION, "desc"); 
-	    values.put(Images.Media.DATE_TAKEN, System.currentTimeMillis());
-	    values.put(Images.Media.MIME_TYPE, "image/jpeg");
-	    values.put(MediaStore.MediaColumns.DATA, mFile.getAbsolutePath());
-	    mContext.getContentResolver().insert(Media.EXTERNAL_CONTENT_URI, values);
-	}
-	
-	/*private static void broadcastCaptureFinished() {
-		Intent localIntent = new Intent(ServiceConstants.ACTION_PHOTO_CAPTURE);
-		localIntent.putExtra(ServiceConstants.CAPTURE_STATUS, "SUCCESS");
-		localIntent.putExtra(ServiceConstants.IMAGE_PATH, mFile.getAbsolutePath());
-		LocalBroadcastManager.getInstance(mContext).sendBroadcast(localIntent);
-	}*/
-	
-	private static void setTestFinished() {
-		/*AppPreferences ap = GlobalAccess.getAppPref();
-		ap.setTestFinished();
-		ap.setTestTestResultImagePath(mFile.getAbsolutePath());*/
+		values.put(Media.TITLE, file.getName());
+		values.put(Media.DESCRIPTION, "desc");
+		values.put(Images.Media.DATE_TAKEN, Calendar.getInstance()
+				.getTimeInMillis());
+		values.put(Images.Media.MIME_TYPE, "image/jpeg");
+		values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
+		mContext.getContentResolver()
+		.insert(Media.EXTERNAL_CONTENT_URI, values);
 	}
 
 	public void closeCamera() {
@@ -629,11 +623,9 @@ public class OffScreenCamera implements AppCamera{
 				mImageReader.close();
 				mImageReader = null;
 			}
-			
-			//WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
-			//wm.removeView(mTextureView);
 		} catch (InterruptedException e) {
-			throw new RuntimeException("Interrupted while trying to lock camera closing.", e);
+			throw new RuntimeException(
+					"Interrupted while trying to lock camera closing.", e);
 		} finally {
 			mCameraOpenCloseLock.release();
 		}
@@ -648,5 +640,124 @@ public class OffScreenCamera implements AppCamera{
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+	}
+
+	static class CompareSizesByArea implements Comparator<Size> {
+
+		@Override
+		public int compare(Size lhs, Size rhs) {
+			// We cast here to ensure the multiplications won't overflow
+			return Long.signum((long) lhs.getWidth() * lhs.getHeight()
+					- (long) rhs.getWidth() * rhs.getHeight());
+		}
+
+	}
+
+	public void changeFocal(float focal) {
+		mCurrentFocal = focal;
+		mPreviewRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE,
+				mCurrentFocal);
+		Log.e("INPUTS", "Focus : " + mCurrentFocal);
+		// Finally, we start displaying the camera preview.
+		buildPreviewRequest();
+	}
+	
+	public void setWhiteBalaceMode(int mode) {
+		mCurrentWbMode = mode;
+		mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, mode);
+		buildPreviewRequest();
+	}
+	
+	public int[] getAWBModes() {
+		return mCharacteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES);
+		
+	}
+	
+	public float calculateFocal(int progress) {
+		float minimumLens = mCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+		return (((float) progress) * minimumLens / 100);
+	}
+	
+	public int toFocalToProgeres(float focal) {
+		float minimumLens = mCharacteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE);
+		return (int)(focal / minimumLens * 100);
+	}
+	
+	public void setAE(double progress) {
+		if (progress == 0) return ;
+		Range<Long> range3 = mCharacteristics
+				.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+		Long max = range3.getUpper();// 10000
+		Log.e("INPUTS", "AE  max: " + max);
+		Long min = range3.getLower();// 100
+		Log.e("INPUTS", "AE  min: " + min);
+		//mCurrentAE = ((progress * (max - min)) / 100 + min);
+		mCurrentAE = (long) ((long) (1000000000.0 / progress)); 
+		Log.e("INPUTS", "AE : " + mCurrentAE);
+		mPreviewRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, mCurrentAE);
+		buildPreviewRequest();
+	}
+	
+	public Range<Long> getAERange(){
+		return mCharacteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE);
+	}
+
+	public void setISO(int iso) {
+		if (iso == 0) return ;
+		Range<Integer> range2 = mCharacteristics
+				.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+		int max1 = range2.getUpper();// 10000
+		int min1 = range2.getLower();// 100
+		//mCurrentIso = ((progress * (max1 - min1)) / 100 + min1);
+		mCurrentIso = iso;
+		Log.e("INPUTS", "ISO : " + mCurrentIso);
+		mPreviewRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY,
+				mCurrentIso);
+		buildPreviewRequest();
+	}
+	
+	public Range<Integer> getISORange(){
+		return mCharacteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+	}
+	
+	private void buildPreviewRequest() {
+		mPreviewRequest = mPreviewRequestBuilder.build();
+		try {
+			mCaptureSession.setRepeatingRequest(mPreviewRequest,
+					mCaptureCallback, mBackgroundHandler);
+		} catch (CameraAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void takePicture(ListView imageList, long delay, int minAE, int maxAE, int aeStep, String wb, String iso) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void takeSinglePicture(ListView imageList, long delay) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void setWB(String wb) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void setISO(String ISO) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void setEV(double ev) {
+		// TODO Auto-generated method stub
+		
 	}
 }

@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/camera_settings_view"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#ffffffff"
+    android:orientation="vertical"
+    android:paddingBottom="5dp" >
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="5dp" >
+
+        <EditText
+            android:id="@+id/AE_edittext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="AE "
+            android:inputType="numberDecimal" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.0" >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="AE"
+                android:textColor="#9E9E9E" />
+
+            <SeekBar
+                android:id="@+id/aeseekbar"
+                android:progress="6"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:max="100" />
+        </RelativeLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="5dp" >
+
+        <EditText
+            android:id="@+id/ISO_edittext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="ISO"
+            android:inputType="numberDecimal" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.0" >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="ISO"
+                android:textColor="#9E9E9E" />
+
+            <SeekBar
+                android:id="@+id/isoseekbar"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:max="100" />
+        </RelativeLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="5dp" >
+
+        <EditText
+            android:id="@+id/FocalLength_edittext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="FL"
+            android:inputType="numberDecimal" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.0" >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="Focus"
+                android:textColor="#9E9E9E" />
+
+            <SeekBar
+                android:id="@+id/focusseekbar"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:max="100" />
+        </RelativeLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="5dp" >
+
+        <EditText
+            android:id="@+id/WhiteBalance_edittext"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="WB"
+            android:inputType="numberDecimal" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1.0" >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="WB"
+                android:textColor="#9E9E9E" />
+
+            <SeekBar
+                android:id="@+id/whiteBalance_seekbar"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:max="100" />
+        </RelativeLayout>
+    </LinearLayout>
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Apply" 
+        android:onClick="onCameraSettingsApply"/>
+
+</LinearLayout>

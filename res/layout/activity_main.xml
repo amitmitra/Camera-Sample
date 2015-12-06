@@ -2,31 +2,398 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:baselineAligned="false"
-    android:paddingBottom="@dimen/activity_vertical_margin"
-    android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".MainActivity" >
 
     <TextureView
         android:id="@+id/camera_preview"
-        android:layout_width="200dp"
-        android:layout_height="200dp" 
-        android:layout_centerHorizontal="true"/>
-
-    <Button
-        android:id="@+id/button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/camera_preview"
         android:layout_centerHorizontal="true"
-        android:text="@string/capture_button" />
+        android:layout_width="250dp"
+        android:layout_height="250dp" />
 
-    <ListView
-        android:id="@+id/image_list"
+    <LinearLayout
+        android:id="@+id/camera1_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/button"/>
+        android:layout_below="@id/camera_preview"
+        android:orientation="vertical" >
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/holo_blue_bright"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/capture_tab"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.0"
+                android:background="@drawable/tab_bkg_selector"
+                android:clickable="true"
+                android:gravity="center"
+                android:onClick="onTab1Clicked"
+                android:paddingBottom="5dp"
+                android:paddingTop="5dp"
+                android:tag="0"
+                android:text="Capture"
+                android:textColor="@android:color/holo_blue_dark" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.0"
+                android:background="@drawable/tab_bkg_selector"
+                android:clickable="true"
+                android:gravity="center"
+                android:onClick="onTab1Clicked"
+                android:paddingBottom="5dp"
+                android:paddingTop="5dp"
+                android:tag="1"
+                android:text="Images"
+                android:textColor="@android:color/holo_blue_dark" />
+        </LinearLayout>
+
+        <ViewFlipper
+            android:id="@+id/viewfliper1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" >
+
+            <LinearLayout
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" >
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:orientation="horizontal" >
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="White Balance : "
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/white_balance_spinner"
+                        android:layout_width="wrap_content"
+                        android:layout_height="30dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:orientation="horizontal" >
+
+                    <TextView
+                        android:id="@+id/iso_supported"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:text="ISO : "
+                        android:textStyle="bold" />
+
+                    <Spinner
+                        android:id="@+id/iso_spinner"
+                        android:layout_width="wrap_content"
+                        android:layout_height="30dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:orientation="horizontal" >
+
+                    <EditText
+                        android:id="@+id/ev_value"
+                        android:layout_width="50dp"
+                        android:layout_height="wrap_content"
+                        android:hint="EV"
+                        android:inputType="numberSigned" />
+
+                    <Button
+                        android:id="@+id/setEVButton"
+                        android:layout_width="50dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="10dp"
+                        android:text="Set" />
+
+                    <Button
+                        android:id="@+id/capture_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="10dp"
+                        android:text="Capture" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/aeValues"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"/>
+
+                <LinearLayout
+                    android:id="@+id/setExposureLayout"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:orientation="horizontal" >
+
+                    <EditText
+                        android:id="@+id/aeMin"
+                        android:layout_width="80dp"
+                        android:layout_height="wrap_content"
+                        android:hint="Min AE"
+                        android:inputType="numberSigned" />
+
+                    <EditText
+                        android:id="@+id/aeMax"
+                        android:layout_width="80dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="10dp"
+                        android:hint="Max AE"
+                        android:inputType="numberSigned" />
+
+                    <EditText
+                        android:id="@+id/aeStep"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="10dp"
+                        android:hint="Increment"
+                        android:inputType="numberSigned" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/captureImageLayout"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" >
+
+                    <EditText
+                        android:id="@+id/capture_delay"
+                        android:layout_width="150dp"
+                        android:layout_height="wrap_content"
+                        android:hint="Enter Delay in ms"
+                        android:inputType="number" />
+
+                    <Button
+                        android:id="@+id/button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/capture_button" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <include
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                layout="@layout/image_list_layout1"
+                android:visibility="visible" />
+        </ViewFlipper>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/camera2_layout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/camera_preview"
+        android:background="@android:color/white"
+        android:keepScreenOn="true"
+        android:orientation="vertical"
+        android:padding="5dp" >
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/holo_blue_bright"
+            android:orientation="horizontal" >
+
+            <TextView
+                android:id="@+id/timers_tab"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.0"
+                android:background="@drawable/tab_bkg_selector"
+                android:gravity="center"
+                android:onClick="onTab2Clicked"
+                android:paddingBottom="5dp"
+                android:paddingTop="5dp"
+                android:tag="0"
+                android:text="Timers"
+                android:textColor="@android:color/holo_blue_dark" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.0"
+                android:background="@drawable/tab_bkg_selector"
+                android:gravity="center"
+                android:onClick="onTab2Clicked"
+                android:paddingBottom="5dp"
+                android:paddingTop="5dp"
+                android:tag="1"
+                android:text="Settings"
+                android:textColor="@android:color/holo_blue_dark" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.0"
+                android:background="@drawable/tab_bkg_selector"
+                android:gravity="center"
+                android:onClick="onTab2Clicked"
+                android:paddingBottom="5dp"
+                android:paddingTop="5dp"
+                android:tag="2"
+                android:text="Images"
+                android:textColor="@android:color/holo_blue_dark" />
+        </LinearLayout>
+
+        <ViewFlipper
+            android:id="@+id/viewfliper2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" >
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" >
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" >
+
+                    <Button
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:onClick="onMinus"
+                        android:text="-" />
+
+                    <TextView
+                        android:id="@+id/pateint_id"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1.0"
+                        android:gravity="center" />
+
+                    <Button
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:onClick="onPlus"
+                        android:text="+" />
+
+                    <TextView
+                        android:id="@+id/remaining_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom"
+                        android:layout_weight="1.0"
+                        android:gravity="center"
+                        android:text="0"
+                        android:textSize="36sp" />
+                </LinearLayout>
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" >
+
+                    <Button
+                        android:id="@+id/delaycapture_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="onStartCaptureTimer"
+                        android:text="Start 5- Min Capture Timer" />
+
+                    <Button
+                        android:id="@+id/diptimer_button"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:onClick="onStartDipTimer"
+                        android:text="Start Dip Timer" />
+                </RelativeLayout>
+
+                <Button
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:onClick="onStartFastCapture"
+                    android:text="Start Fast Capture" />
+                
+                <LinearLayout
+                    android:id="@+id/setExposureLayout2"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"
+                    android:orientation="horizontal" >
+
+                    <EditText
+                        android:id="@+id/aeMin2"
+                        android:layout_width="80dp"
+                        android:layout_height="wrap_content"
+                        android:hint="Min AE"
+                        android:inputType="numberSigned" />
+
+                    <EditText
+                        android:id="@+id/aeMax2"
+                        android:layout_width="80dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="10dp"
+                        android:hint="Max AE"
+                        android:inputType="numberSigned" />
+
+                    <EditText
+                        android:id="@+id/aeStep2"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="10dp"
+                        android:hint="Increment"
+                        android:inputType="numberSigned" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/captureImageLayout2"
+                    android:layout_width="fill_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" >
+
+                    <EditText
+                        android:id="@+id/capture_delay2"
+                        android:layout_width="150dp"
+                        android:layout_height="wrap_content"
+                        android:hint="Enter Delay in ms"
+                        android:inputType="number" />
+
+                    <Button
+                        android:id="@+id/button2"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/capture_button" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <include
+                android:id="@+id/camera_settings_view"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                layout="@layout/camera_settings"
+                android:visibility="visible" />
+
+            <include
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                layout="@layout/image_list_layout2"
+                android:visibility="visible" />
+        </ViewFlipper>
+
+        <!--
+             <include
+            android:id="@+id/camera_preview_view"
+            layout="@layout/fragment_camerafocus"
+            android:visibility="visible" />
+        -->
+    </LinearLayout>
 
 </RelativeLayout>
